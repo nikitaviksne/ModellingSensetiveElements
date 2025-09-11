@@ -48,7 +48,7 @@ C_b_n = np.array([[],
                   []])
 '''
 
-Vabs = 0 # модуль конечной линейной скорости, м/с
+Vabs = 30 # модуль конечной линейной скорости, м/с
 phi0 = np.deg2rad(55)
 lmbda0 = np.deg2rad(33)
 
@@ -57,7 +57,7 @@ time_start_turn = (t_nav + time_to_alignment)//2 - time_to_turn // 2# время
 time_stop_turn = (t_nav + time_to_alignment)//2 + time_to_turn // 2# время в сек (от подачи питания, т.е начала выставки) окончания поворота 
 angle_turn = np.deg2rad(90) # угол разворота, в рад
 om_turn = - angle_turn / (time_to_turn ) #угловая скорость поворота в проекции на местную вертикаль (положительное мзменение курса по часовой, следовательно угловая скрость отрицательная), рад/с
-Om_turn = np.zeros(3); Om_turn[2] = om_turn; # массив угшловых скоростей разворота
+Om_turn = np.zeros(3); Om_turn[2] = om_turn; # массив угловых скоростей разворота
 
 '''тип файлы, бинарный или текстовый'''
 extention_out_file = "csv" # bin (для бинарного) или csv (для текстового)
@@ -107,18 +107,31 @@ for i in range(1,num_samples):
 
 '''моделируем идеальный курс после начала навигации'''
 # До поворота (включая время выставки) он постоянный и равный heading0, во время поворота он меняется с угловой скоростью om_turn; далее курс опять постоянный, равен heading0 + angle_turn
-heading = np.concatenate((np.array([heading0 for _ in range(0, time_start_turn*freq)]), np.array([heading0 - i/freq*om_turn for i in range(0, (time_stop_turn - time_start_turn )*freq)]), np.array([heading0+angle_turn for _ in range(time_stop_turn* freq, num_samples)]) )) #heading за все время моделирования (включая время выставки)
+# heading = np.concatenate((np.array([heading0 for _ in range(0, time_start_turn*freq)]), np.array([heading0 - i/freq*om_turn for i in range(0, (time_stop_turn - time_start_turn )*freq)]), np.array([heading0+angle_turn for _ in range(time_stop_turn* freq, num_samples)]) )) #heading за все время моделирования (включая время выставки)
+heading = np.array([heading0 for _ in range(0, time_start_turn*freq)] + [heading0 - i/freq*om_turn for i in range(0, (time_stop_turn - time_start_turn )*freq)] + [heading0+angle_turn for _ in range(time_stop_turn* freq, num_samples)]) # так должно работать быстрее
 
 '''Моделируем измерения в связанной системе координат и записываем в файл'''
-Ve = np.array([Vabs*np.sin(heading[iii]) for iii in range((t_nav - time_to_alignment)*freq)]) # np.linspace(Vabs*np.sin(heading0), Vabs*np.sin(heading0), (t_nav - time_to_alignment)*freq)
-Vn = np.array([Vabs*np.cos(heading[iii]) for iii in range((t_nav - time_to_alignment)*freq)]) # np.linspace(Vabs*np.cos(heading0), Vabs*np.cos(heading0), (t_nav - time_to_alignment)*freq)
+# Ve = np.array([Vabs*np.sin(heading[iii]) for iii in range(time_to_alignment*freq, (t_nav)*freq)]) # np.linspace(Vabs*np.sin(heading0), Vabs*np.sin(heading0), (t_nav - time_to_alignment)*freq)
+# Vn = np.array([Vabs*np.cos(heading[iii]) for iii in range(time_to_alignment*freq, (t_nav)*freq)]) # np.linspace(Vabs*np.cos(heading0), Vabs*np.cos(heading0), (t_nav - time_to_alignment)*freq)
+# Ve = np.concatenate((np.array([0 for _ in range(time_to_alignment*freq)]), Ve))
+# Vn = np.concatenate((np.array([0 for _ in range(time_to_alignment*freq)]), Vn))
+'''так должно работать быстрее'''
+Ve = [Vabs*np.sin(heading[iii]) for iii in range(time_to_alignment*freq, (t_nav)*freq)] # np.linspace(Vabs*np.sin(heading0), Vabs*np.sin(heading0), (t_nav - time_to_alignment)*freq)
+Vn = [Vabs*np.cos(heading[iii]) for iii in range(time_to_alignment*freq, (t_nav)*freq)] # np.linspace(Vabs*np.cos(heading0), Vabs*np.cos(heading0), (t_nav - time_to_alignment)*freq)
+Ve = np.array([0 for _ in range(time_to_alignment*freq)] + Ve)
+Vn = np.array([0 for _ in range(time_to_alignment*freq)] + Vn)
 
-Ve = np.concatenate((np.array([0 for _ in range(time_to_alignment*freq)]), Ve))
-Vn = np.concatenate((np.array([0 for _ in range(time_to_alignment*freq)]), Vn))
+
+
+allow_dA = True # ускорения как дифференциал скорости
 
 # Изменение высоты полета
-Height = np.linspace(0, 0, (t_nav - time_to_alignment)*freq)
-Height = np.concatenate((np.zeros(time_to_alignment*freq), Height))
+height_start = 0;
+height_stop = 0;
+# Height = np.linspace(0, 0, (t_nav - time_to_alignment)*freq)
+# Height = np.concatenate((np.zeros(time_to_alignment*freq), Height))
+Height = [height_start + (height_stop - height_start)/((t_nav - time_to_alignment)*freq - 1)*i for i in range((t_nav - time_to_alignment)*freq)] #изменение ввысоты от начального до конечного значения на всем протяжении полета
+Height = [0 for _ in range(time_to_alignment*freq)] + Height # значение высоты вместе с выставкой
 
 # Изменение широты
 phi = [phi0] 
@@ -162,20 +175,23 @@ with (open(dest_dir + file_name, type_open_file) as file):
                 Только в случае с инерциальной навигацией "относительная" должна пониматься как относительная относительно
                 инерциального пространства
                 '''
-                if ( (itr >= (time_start_turn) * freq) and (itr <= (time_stop_turn) * freq) ):
-                    allow_turn = True;
+                if ( (itr >= (time_start_turn) * freq) and (itr < (time_stop_turn) * freq) ): #во время движения. есть поворот
+                    allow_turn = True; # добавление угловой скорости поворота
+                    allow_centrifugal = True; # добавление центробедных сил 
                     C_n_b = matrix_o_b(heading[itr], roll, pitch);
-                else:
-                    allow_turn = False;
-                Coriolise = np.cross(2*(Om_e + dOm_or + allow_turn * Om_turn), np.array([Ve[itr], Vn[itr], 0])); #+  np.cross(Om_e, np.array([Ve[itr], Vn[itr], 0])) 
-            else:
+                else: # во время движения. нет поворота
+                    allow_turn = False; # добавление угловой скорости поворота
+                    allow_centrifugal = False; # добавление центробедных сил 
+                Coriolise = np.cross((2*Om_e + dOm_or + 0 * allow_turn * Om_turn), np.array([Ve[itr], Vn[itr], 0])); #+  np.cross(Om_e, np.array([Ve[itr], Vn[itr], 0])) 
+            else: # время выставка, движения никакого нет, следовательно нет ни угловой скорости поворота, ни центробежных сил
                 allow_turn = False; 
+                allow_centrifugal = False; # добавление центробедных сил 
                 dA = np.zeros(3)
                 dOm_or = np.zeros(3) # r -- realtive (относительная)
                 Coriolise = np.zeros(3);
 
             Om_b = C_n_b @ (Om_e + dOm_or + allow_turn * Om_turn);
-            A_b = C_n_b @ (A_o + dA + Coriolise);
+            A_b = C_n_b @ (A_o + allow_dA * dA + Coriolise + ( - 0 * allow_centrifugal*np.array([0, om_turn*Vabs, 0])) ); 
             if (extention_out_file == "csv"):
                 '''Запись в файл в текстовом виде'''
                 for i in range(3):
