@@ -52,18 +52,18 @@ Vabs = 30 # модуль конечной линейной скорости, м/
 phi0 = np.deg2rad(55)
 lmbda0 = np.deg2rad(33)
 
-time_to_turn = 5*60 # время в сек на разворот
-time_start_turn = (t_nav + time_to_alignment)//2 - time_to_turn // 2# время в сек (от подачи питания, т.е начала выставки) начала поворота (time_to_alihnment+ (t_nav - time_to_alignemrnt)/2)
-time_stop_turn = (t_nav + time_to_alignment)//2 + time_to_turn // 2# время в сек (от подачи питания, т.е начала выставки) окончания поворота 
+tics_to_turn = 5*60*freq # время в тактах на разворот
+tics_start_turn = (t_nav + time_to_alignment)*freq//2 - tics_to_turn // 2# время в тактах (от подачи питания, т.е начала выставки) начала поворота (time_to_alihnment+ (t_nav - time_to_alignemrnt)/2)
+tics_stop_turn = (t_nav + time_to_alignment)*freq//2 + (tics_to_turn // 2 + 1)# время в тактах (от подачи питания, т.е начала выставки) окончания поворота 
 angle_turn = np.deg2rad(90) # угол разворота, в рад
-om_turn = - angle_turn / (time_to_turn ) #угловая скорость поворота в проекции на местную вертикаль (положительное мзменение курса по часовой, следовательно угловая скрость отрицательная), рад/с
+om_turn = - angle_turn / (tics_to_turn / freq ) #угловая скорость поворота в проекции на местную вертикаль (положительное мзменение курса по часовой, следовательно угловая скрость отрицательная), рад/с
 Om_turn = np.zeros(3); Om_turn[2] = om_turn; # массив угловых скоростей разворота
 
 '''тип файлы, бинарный или текстовый'''
 extention_out_file = "csv" # bin (для бинарного) или csv (для текстового)
 
 '''задаем ориентацию объекта'''
-heading0 = np.deg2rad(50)
+heading0 = np.deg2rad(0)
 roll = np.deg2rad(0);
 pitch = np.deg2rad(0);
 
@@ -107,8 +107,8 @@ for i in range(1,num_samples):
 
 '''моделируем идеальный курс после начала навигации'''
 # До поворота (включая время выставки) он постоянный и равный heading0, во время поворота он меняется с угловой скоростью om_turn; далее курс опять постоянный, равен heading0 + angle_turn
-# heading = np.concatenate((np.array([heading0 for _ in range(0, time_start_turn*freq)]), np.array([heading0 - i/freq*om_turn for i in range(0, (time_stop_turn - time_start_turn )*freq)]), np.array([heading0+angle_turn for _ in range(time_stop_turn* freq, num_samples)]) )) #heading за все время моделирования (включая время выставки)
-heading = np.array([heading0 for _ in range(0, time_start_turn*freq)] + [heading0 - i/freq*om_turn for i in range(0, (time_stop_turn - time_start_turn )*freq)] + [heading0+angle_turn for _ in range(time_stop_turn* freq, num_samples)]) # так должно работать быстрее
+# heading = np.concatenate((np.array([heading0 for _ in range(0, tics_start_turn*freq)]), np.array([heading0 - i/freq*om_turn for i in range(0, (tics_stop_turn - tics_start_turn )*freq)]), np.array([heading0+angle_turn for _ in range(tics_stop_turn* freq, num_samples)]) )) #heading за все время моделирования (включая время выставки)
+heading = np.array([heading0 for _ in range(0, tics_start_turn)] + [heading0 - i/freq*om_turn for i in range(0, (tics_stop_turn - tics_start_turn ))] + [heading0+angle_turn for _ in range(tics_stop_turn, num_samples)]) # так должно работать быстрее
 
 '''Моделируем измерения в связанной системе координат и записываем в файл'''
 # Ve = np.array([Vabs*np.sin(heading[iii]) for iii in range(time_to_alignment*freq, (t_nav)*freq)]) # np.linspace(Vabs*np.sin(heading0), Vabs*np.sin(heading0), (t_nav - time_to_alignment)*freq)
@@ -153,7 +153,7 @@ with (open(dest_dir + file_name, type_open_file) as file):
         '''
         if (extention_out_file == "bin"):
             s = struct.Struct("<26d");
-        for itr in range(num_samples - 1):
+        for itr in range(0, num_samples-1):
             Rlambda = Re# / np.sqrt(1 - e **2 * np.sin(phi[itr]) **2);
             Rphi = Re# * (1 - e**2) / (np.sqrt(1 - e**2 * np.sin(phi[itr]) **2) * (1 - e**2 * np.sin(phi[itr]) **2));
             
@@ -163,8 +163,8 @@ with (open(dest_dir + file_name, type_open_file) as file):
 
             # Дифференцирование скоростей и прибавление к ускорению
             if (itr>time_to_alignment*freq):
-                dA = np.array([Ve[itr + 1] - Ve[itr], Vn[itr + 1] - Vn[itr],
-                            Height[itr +1] - Height[itr]])
+                dA = np.array([(Ve[itr + 1] - Ve[itr]), (Vn[itr + 1] - Vn[itr]),
+                            (Height[itr + 1] - Height[itr])]) * freq
                 # Изменение угловых скоростей от движения
                 dOm_or = np.array([-Vn[itr] / (Rphi + Height[itr]), #
                                 Ve[itr] / ( (Rlambda + Height[itr]) ), #* np.cos(phi[itr] )
@@ -175,7 +175,7 @@ with (open(dest_dir + file_name, type_open_file) as file):
                 Только в случае с инерциальной навигацией "относительная" должна пониматься как относительная относительно
                 инерциального пространства
                 '''
-                if ( (itr >= (time_start_turn) * freq) and (itr < (time_stop_turn) * freq) ): #во время движения. есть поворот
+                if ( (itr >= (tics_start_turn) ) and (itr < (tics_stop_turn) ) ): #во время движения. есть поворот
                     allow_turn = True; # добавление угловой скорости поворота
                     allow_centrifugal = True; # добавление центробедных сил 
                     C_n_b = matrix_o_b(heading[itr], roll, pitch);
@@ -191,6 +191,7 @@ with (open(dest_dir + file_name, type_open_file) as file):
                 Coriolise = np.zeros(3);
 
             Om_b = C_n_b @ (Om_e + dOm_or + allow_turn * Om_turn);
+            C_n_b = matrix_o_b(heading[itr-1], roll, pitch) # надо для того, чтобы привести к соответсвию ускорения и угловые скорости, так как сначала решается задача ориентации
             A_b = C_n_b @ (A_o + allow_dA * dA + Coriolise + ( - 0 * allow_centrifugal*np.array([0, om_turn*Vabs, 0])) ); 
             if (extention_out_file == "csv"):
                 '''Запись в файл в текстовом виде'''
