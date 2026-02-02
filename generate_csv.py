@@ -48,11 +48,11 @@ C_b_n = np.array([[],
                   []])
 '''
 
-Vabs = 30 # модуль конечной линейной скорости, м/с
+Vabs = 0 # модуль конечной линейной скорости, м/с
 phi0 = np.deg2rad(55)
 lmbda0 = np.deg2rad(33)
 
-tics_to_turn = 5*60*freq # время в тактах на разворот
+tics_to_turn = 1 #5*60*freq # время в тактах на разворот
 tics_start_turn = (t_nav + time_to_alignment)*freq//2 - tics_to_turn // 2# время в тактах (от подачи питания, т.е начала выставки) начала поворота (time_to_alihnment+ (t_nav - time_to_alignemrnt)/2)
 tics_stop_turn = (t_nav + time_to_alignment)*freq//2 + (tics_to_turn // 2 + 1)# время в тактах (от подачи питания, т.е начала выставки) окончания поворота 
 angle_turn = np.deg2rad(90) # угол разворота, в рад
@@ -67,13 +67,14 @@ heading0 = np.deg2rad(0)
 roll = np.deg2rad(0);
 pitch = np.deg2rad(0);
 
-file_name = f"data_acc_veloc_{Vabs}_heading_{int(np.rad2deg(heading0))}_R_{int(np.rad2deg(roll))}_P_{int(np.rad2deg(pitch))}_freq_{freq}_turn_V_coo_gps.{extention_out_file}"
+# file_name = f"data_acc_veloc_{Vabs}_heading_{int(np.rad2deg(heading0))}_R_{int(np.rad2deg(roll))}_P_{int(np.rad2deg(pitch))}_freq_{freq}_turn_V_coo_gps.{extention_out_file}"
+file_name = f"horizontal_gyr_bias_{Vabs}_heading_{int(np.rad2deg(heading0))}_R_{int(np.rad2deg(roll))}_P_{int(np.rad2deg(pitch))}_freq_{freq}_V_coo_gps_fast_turn.{extention_out_file}"
 dest_dir = "/home/nikita/Документы/C_Cpp_progs/InertialNavigation/Data_files/" #дериктория назначения
 C_n_b = matrix_o_b(heading0, roll, pitch)
 
 '''Систематические дрейфы'''
-bias_acc = 1e-4;
-bias_gyr = np.deg2rad(0.05)/3600;
+bias_acc = np.array([1e-4 for _ in range(3)]);
+bias_gyr = np.array([np.deg2rad(0.05)/3600, np.deg2rad(0.05)/3600, np.deg2rad(0.05)/3600]);
 '''Случайные дрейфы'''
 T_k_a = 1
 beta_acc = 1/T_k_a
@@ -103,7 +104,7 @@ for i in range(1,num_samples):
         #акселерометры
         colour_noise_acc[jj][i] = colour_noise_acc[jj][i-1] * (1 - beta_acc/freq) + std_acc*np.sqrt(2*beta_acc/freq)*white_noise_acc[jj][i-1]
         #гироскопы  
-        colour_noise_gyr[jj][i] = colour_noise_gyr[jj][i-1]*(1-beta_gyr/freq) + std_gyr*np.sqrt(2*beta_gyr/freq)*white_noise_gyr[jj][i-1]
+        colour_noise_gyr[jj][i] = colour_noise_gyr[jj][i-1] * (1 - beta_gyr/freq) + std_gyr*np.sqrt(2*beta_gyr/freq)*white_noise_gyr[jj][i-1]
 
 '''моделируем идеальный курс после начала навигации'''
 # До поворота (включая время выставки) он постоянный и равный heading0, во время поворота он меняется с угловой скоростью om_turn; далее курс опять постоянный, равен heading0 + angle_turn
@@ -191,8 +192,8 @@ with (open(dest_dir + file_name, type_open_file) as file):
                 Coriolise = np.zeros(3);
 
             Om_b = C_n_b @ (Om_e + dOm_or + allow_turn * Om_turn);
-            C_n_b = matrix_o_b(heading[itr-1], roll, pitch) # надо для того, чтобы привести к соответсвию ускорения и угловые скорости, так как сначала решается задача ориентации
             A_b = C_n_b @ (A_o + allow_dA * dA + Coriolise + ( - 0 * allow_centrifugal*np.array([0, om_turn*Vabs, 0])) ); 
+            C_n_b = matrix_o_b(heading[itr], roll, pitch) # 
             if (extention_out_file == "csv"):
                 '''Запись в файл в текстовом виде'''
                 for i in range(3):
@@ -201,9 +202,9 @@ with (open(dest_dir + file_name, type_open_file) as file):
                     file.write(f"{np.round(Om_b[i], round)};")
                 
                 for i in range(3):
-                    file.write(f"{np.round(bias_acc, round)};") # Смещение нулей акселерометров
+                    file.write(f"{np.round(bias_acc[i], round)};") # Смещение нулей акселерометров
                 for i in range(3):
-                    file.write(f"{np.round(bias_gyr, round)};") # Смещение нулей гироскопов в рад/с
+                    file.write(f"{np.round(bias_gyr[i], round)};") # Смещение нулей гироскопов в рад/с
                 for i in range(3):
                     file.write(f"{np.round(colour_noise_acc[i][itr], round)};") # Случайные погрешности акселерометров
                 for i in range(3):

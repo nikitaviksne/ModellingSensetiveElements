@@ -72,4 +72,25 @@ fig10_ax3.set_xlabel("мин")
 # fig10_ax3.set_ylabel("$\dfrac{\\text{м}}{\\text{с}^2}$")
 fig10_ax3.grid(True)
 
+'''Случайные погрешности гироскопов'''
+fig5, (fig5_ax1, fig5_ax2, fig5_ax3) = plt.subplots(ncols=1, nrows=3)
+fig5.suptitle("Случайные погрешности гирскопов")
+fig5_ax1.set_title("$\delta\omega_{xb}$")
+fig5_ax1.plot(time, 3600*np.rad2deg(data["randOmbx"]))
+fig5_ax1.set_xlabel("мин")
+fig5_ax1.set_ylabel("град/ч")
+fig5_ax1.grid(True)
+# 
+fig5_ax2.set_title("$\delta\omega_{yb}$")
+fig5_ax2.plot(time, 3600*np.rad2deg(data["randOmby"]))
+fig5_ax2.set_xlabel("мин")
+fig5_ax2.set_ylabel("град/ч")
+fig5_ax2.grid(True)
+# 
+fig5_ax3.set_title("$\delta\omega_{zb}$")
+fig5_ax3.plot(time, 3600*np.rad2deg(data["randOmbz"]))
+fig5_ax3.set_xlabel("мин")
+fig5_ax3.set_ylabel("град/ч")
+fig5_ax3.grid(True)
+
 plt.show()
