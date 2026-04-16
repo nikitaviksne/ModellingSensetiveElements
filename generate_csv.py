@@ -55,7 +55,7 @@ lmbda0 = np.deg2rad(33)
 tics_to_turn = 1 #5*60*freq # время в тактах на разворот
 tics_start_turn = (t_nav + time_to_alignment)*freq//2 - tics_to_turn // 2# время в тактах (от подачи питания, т.е начала выставки) начала поворота (time_to_alihnment+ (t_nav - time_to_alignemrnt)/2)
 tics_stop_turn = (t_nav + time_to_alignment)*freq//2 + (tics_to_turn // 2 + 1)# время в тактах (от подачи питания, т.е начала выставки) окончания поворота 
-angle_turn = np.deg2rad(90) # угол разворота, в рад
+angle_turn = np.deg2rad(00) # угол разворота, в рад
 om_turn = - angle_turn / (tics_to_turn / freq ) #угловая скорость поворота в проекции на местную вертикаль (положительное мзменение курса по часовой, следовательно угловая скрость отрицательная), рад/с
 Om_turn = np.zeros(3); Om_turn[2] = om_turn; # массив угловых скоростей разворота
 
@@ -68,13 +68,13 @@ roll = np.deg2rad(0);
 pitch = np.deg2rad(0);
 
 # file_name = f"data_acc_veloc_{Vabs}_heading_{int(np.rad2deg(heading0))}_R_{int(np.rad2deg(roll))}_P_{int(np.rad2deg(pitch))}_freq_{freq}_turn_V_coo_gps.{extention_out_file}"
-file_name = f"horizontal_gyr_bias_{Vabs}_heading_{int(np.rad2deg(heading0))}_R_{int(np.rad2deg(roll))}_P_{int(np.rad2deg(pitch))}_freq_{freq}_V_coo_gps_fast_turn.{extention_out_file}"
+file_name = f"horizontal_gyr_bias_{Vabs}_heading_{int(np.rad2deg(heading0))}_R_{int(np.rad2deg(roll))}_P_{int(np.rad2deg(pitch))}_freq_{freq}_V_coo_gps_debug.{extention_out_file}"
 dest_dir = "/home/nikita/Документы/C_Cpp_progs/InertialNavigation/Data_files/" #дериктория назначения
 C_n_b = matrix_o_b(heading0, roll, pitch)
 
 '''Систематические дрейфы'''
 bias_acc = np.array([1e-4 for _ in range(3)]);
-bias_gyr = np.array([np.deg2rad(0.05)/3600, np.deg2rad(0.05)/3600, np.deg2rad(0.05)/3600]);
+bias_gyr = np.array([np.deg2rad(0.1)/3600, np.deg2rad(0.1)/3600, np.deg2rad(0.1)/3600]);
 '''Случайные дрейфы'''
 T_k_a = 1
 beta_acc = 1/T_k_a
